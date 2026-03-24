@@ -26,10 +26,11 @@ def build_rag_chain(vectorstore, top_k=4):
     )
 
     llm = HuggingFaceEndpoint(
-        repo_id="google/flan-t5-base",
-        temperature=0.5,
-        huggingfacehub_api_token=st.secrets["HUGGINGFACE_API_KEY"]
-    )
+    repo_id="google/flan-t5-base",
+    huggingfacehub_api_token=st.secrets["HUGGINGFACEHUB_API_TOKEN"],
+    temperature=0.5,
+    max_new_tokens=512
+)
 
     def format_docs(docs):
         return "\n\n".join(doc.page_content for doc in docs)
