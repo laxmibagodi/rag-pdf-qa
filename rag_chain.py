@@ -36,26 +36,18 @@ def load_model():
         return HuggingFacePipeline(pipeline=pipe)
 
 
-def build_rag_chain(vectorstore, top_k=4):
+def build_rag_chain(vectorstore, top_k=2):
+
     retriever = vectorstore.as_retriever(
         search_type="mmr",
-        search_kwargs={"k": top_k, "fetch_k": top_k * 3},
+        search_kwargs={"k": top_k},
     )
-   @st.cache_resource
-   def load_model():
-       pipe = pipeline(
-           "text-generation",
-           model="distilgpt2",   # fast + stable
-           max_new_tokens=120,
-           temperature=0.3,
-    )
-        return HuggingFacePipeline(pipeline=pipe)
 
-    llm = HuggingFacePipeline(pipeline=pipe)
+    # ✅ USE CACHED MODEL
+    llm = load_model()
 
-    # 🔥 LIMIT CONTEXT SIZE (prevents overflow + bad answers)
     def format_docs(docs):
-        return "\n\n".join(doc.page_content[:500] for doc in docs)
+        return "\n\n".join(doc.page_content[:300] for doc in docs)
 
     chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
