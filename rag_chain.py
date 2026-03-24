@@ -37,7 +37,7 @@ def build_rag_chain(vectorstore, top_k=4):
     temperature=0.5
 )
 
-llm = HuggingFacePipeline(pipeline=pipe)
+    llm = HuggingFacePipeline(pipeline=pipe)
 
     def format_docs(docs):
         return "\n\n".join(doc.page_content for doc in docs)
