@@ -31,14 +31,12 @@ def build_rag_chain(vectorstore, top_k=4):
         search_type="mmr",
         search_kwargs={"k": top_k, "fetch_k": top_k * 3},
     )
-
-    # ✅ USE PROPER QA MODEL (NOT GPT2)
     pipe = pipeline(
-        "text2text-generation",                 # ✅ correct task
-        model="google/flan-t5-base",            # ✅ instruction-tuned
-        max_new_tokens=200,
-        temperature=0.2,
-    )
+    "text-generation",
+    model="tiiuae/falcon-rw-1b",
+    max_new_tokens=200,
+    temperature=0.2,
+)
 
     llm = HuggingFacePipeline(pipeline=pipe)
 
