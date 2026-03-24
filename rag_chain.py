@@ -27,15 +27,13 @@ def build_rag_chain(vectorstore, top_k=4):
         search_kwargs={"k": top_k, "fetch_k": top_k * 3},
     )
 
-    from transformers import pipeline
-    from langchain_huggingface import HuggingFacePipeline
-
     pipe = pipeline(
-    "text-generation",
-    model="distilgpt2",
-    max_length=512,
-    temperature=0.5
-)
+        "text2text-generation",   # correct task
+        model="google/flan-t5-base",
+        max_new_tokens=200,       # FIXED (no max_length error)
+        temperature=0.3
+    )
+
 
     llm = HuggingFacePipeline(pipeline=pipe)
 
