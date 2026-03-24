@@ -1,6 +1,8 @@
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
+from transformers import pipeline
+from langchain_huggingface import HuggingFacePipeline
 
 from langchain_huggingface import HuggingFaceEndpoint
 import streamlit as st
@@ -29,13 +31,13 @@ def build_rag_chain(vectorstore, top_k=4):
     from langchain_huggingface import HuggingFacePipeline
 
     pipe = pipeline(
-        "text2text-generation",
-        model="google/flan-t5-base",
-        max_length=512,
-        temperature=0.5
-    )
+    "text-generation",
+    model="distilgpt2",
+    max_length=512,
+    temperature=0.5
+)
 
-    llm = HuggingFacePipeline(pipeline=pipe)
+llm = HuggingFacePipeline(pipeline=pipe)
 
     def format_docs(docs):
         return "\n\n".join(doc.page_content for doc in docs)
