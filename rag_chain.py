@@ -25,12 +25,17 @@ def build_rag_chain(vectorstore, top_k=4):
         search_kwargs={"k": top_k, "fetch_k": top_k * 3},
     )
 
-    llm = HuggingFaceEndpoint(
-    repo_id="google/flan-t5-base",
-    huggingfacehub_api_token=st.secrets["HUGGINGFACEHUB_API_TOKEN"],
-    temperature=0.5,
-    max_new_tokens=512
-)
+    from transformers import pipeline
+    from langchain_huggingface import HuggingFacePipeline
+
+    pipe = pipeline(
+        "text2text-generation",
+        model="google/flan-t5-base",
+        max_length=512,
+        temperature=0.5
+    )
+
+    llm = HuggingFacePipeline(pipeline=pipe)
 
     def format_docs(docs):
         return "\n\n".join(doc.page_content for doc in docs)
@@ -43,7 +48,6 @@ def build_rag_chain(vectorstore, top_k=4):
     )
 
     return chain, retriever
-
 
 def ask_question(chain_tuple, question, chat_history):
     chain, retriever = chain_tuple
