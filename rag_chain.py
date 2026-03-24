@@ -25,6 +25,16 @@ Answer:"""
 
 _QA_PROMPT = PromptTemplate.from_template(_QA_TEMPLATE)
 
+@st.cache_resource
+def load_model():
+    pipe = pipeline(
+        "text-generation",
+        model="distilgpt2",   # fast + stable
+        max_new_tokens=120,
+        temperature=0.3,
+    )
+        return HuggingFacePipeline(pipeline=pipe)
+
 
 def build_rag_chain(vectorstore, top_k=4):
     retriever = vectorstore.as_retriever(
