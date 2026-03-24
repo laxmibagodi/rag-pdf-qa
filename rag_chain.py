@@ -31,12 +31,15 @@ def build_rag_chain(vectorstore, top_k=4):
         search_type="mmr",
         search_kwargs={"k": top_k, "fetch_k": top_k * 3},
     )
-    pipe = pipeline(
-    "text-generation",
-    model="tiiuae/falcon-rw-1b",
-    max_new_tokens=200,
-    temperature=0.2,
-)
+    @st.cache_resource
+    def load_model():
+        pipe = pipeline(
+            "text-generation",
+            model="distilgpt2",   # 🔥 FAST (use this first)
+            max_new_tokens=120,
+            temperature=0.3,
+        )
+        return HuggingFacePipeline(pipeline=pipe)
 
     llm = HuggingFacePipeline(pipeline=pipe)
 
