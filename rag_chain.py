@@ -33,7 +33,7 @@ def load_model():
         max_new_tokens=120,
         temperature=0.3,
     )
-        return HuggingFacePipeline(pipeline=pipe)
+    return HuggingFacePipeline(pipeline=pipe)
 
 
 def build_rag_chain(vectorstore, top_k=2):
