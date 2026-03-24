@@ -28,11 +28,12 @@ def build_rag_chain(vectorstore, top_k=4):
     )
 
     pipe = pipeline(
-        "text2text-generation",   # correct task
-        model="google/flan-t5-base",
-        max_new_tokens=200,       # FIXED (no max_length error)
-        temperature=0.3
-    )
+    "text-generation",              # ✅ FIXED
+    model="gpt2",                   # ✅ compatible with this task
+    max_new_tokens=200,
+    temperature=0.3
+)
+
 
 
     llm = HuggingFacePipeline(pipeline=pipe)
