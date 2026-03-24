@@ -2,8 +2,8 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 
-from transformers import pipeline
-from langchain_huggingface import HuggingFacePipeline
+ffrom langchain_huggingface import HuggingFaceEndpoint
+import streamlit as st
 
 
 _QA_TEMPLATE = """You are a helpful assistant that answers questions based only on the provided context.
@@ -25,14 +25,11 @@ def build_rag_chain(vectorstore, top_k=4):
         search_kwargs={"k": top_k, "fetch_k": top_k * 3},
     )
 
-    # 🔥 FREE LLM (no OpenAI)
-    pipe = pipeline(
-        "text2text-generation",
-        model="google/flan-t5-base",
-        max_new_tokens=200
+    llm = HuggingFaceEndpoint(
+        repo_id="google/flan-t5-base",
+        temperature=0.5,
+        huggingfacehub_api_token=st.secrets["HUGGINGFACE_API_KEY"]
     )
-
-    llm = HuggingFacePipeline(pipeline=pipe)
 
     def format_docs(docs):
         return "\n\n".join(doc.page_content for doc in docs)
