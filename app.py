@@ -6,8 +6,7 @@ from rag_chain import build_rag_chain, ask_question
 load_dotenv()
 
 st.set_page_config(
-    page_title="PDF RAG Q&A
-    ",
+    page_title="PDF RAG Q&A",
     page_icon="📄",
     layout="wide",
     initial_sidebar_state="expanded"
