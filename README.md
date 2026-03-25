@@ -62,7 +62,6 @@ Final Answer + Sources
 - 🎯 MMR retrieval (diverse + relevant chunks)  
 - 🧠 Smart routing:
   - Extractive QA (precise answers)
-  - Summary mode (for open-ended questions)  
 - 🧾 Source attribution (file + page number)  
 - 🛠 Adjustable chunking parameters  
 
