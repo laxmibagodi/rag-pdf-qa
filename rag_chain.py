@@ -15,7 +15,6 @@ def load_qa_model():
 def get_answer_from_context(question: str, context: str) -> dict:
     tokenizer, model = load_qa_model()
 
-    # Truncate context to avoid token limit (max 512 for roberta)
     inputs = tokenizer(
         question,
         context,
@@ -63,14 +62,13 @@ def build_rag_chain(vectorstore, top_k=4):
 def ask_question(retriever, question: str, chat_history):
     # Step 1: Retrieve relevant chunks
     docs = retriever.invoke(question)
-
     if not docs:
         return {"answer": "I couldn't find that in the uploaded documents.", "sources": []}
 
-    # Step 2: Try each chunk and pick the best answer
     best_answer = ""
     best_score = -float("inf")
 
+    # Step 2a: Try each chunk individually
     for doc in docs:
         context = doc.page_content.strip()
         if not context:
@@ -80,8 +78,22 @@ def ask_question(retriever, question: str, chat_history):
             best_score = result["score"]
             best_answer = result["answer"]
 
+    # Step 2b: Also try combined context
+    # Helps when the answer spans across chunk boundaries
+    combined_context = " ".join(
+        doc.page_content.strip() for doc in docs if doc.page_content.strip()
+    )
+    if combined_context:
+        result = get_answer_from_context(question, combined_context)
+        if result["score"] > best_score:
+            best_score = result["score"]
+            best_answer = result["answer"]
+
     # Step 3: Confidence check
-    if not best_answer or best_score < 0.5:
+    # RoBERTa returns raw logits, NOT probabilities (range ~-10 to +10).
+    # A threshold of 0.5 was incorrectly rejecting valid answers.
+    # -5 is a safe lower bound for a real answer being present.
+    if not best_answer or best_score < -5:
         best_answer = "I couldn't find a clear answer in the uploaded documents."
 
     # Step 4: Collect sources
