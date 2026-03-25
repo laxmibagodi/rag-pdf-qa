@@ -282,10 +282,10 @@ with st.sidebar:
         <div style='text-align: center; padding: 0 0 2rem 0'>
             <div style='font-size: 3rem; line-height: 1'>📄</div>
             <h2 style='margin: 0.5rem 0 0.25rem 0; font-size: 1.5rem; font-weight: 700; color: var(--text-primary)'>
-                Document Intelligence
+                PDF RAG Q&A
             </h2>
             <div style='color: var(--text-muted); font-size: 0.85rem; font-weight: 400'>
-                AI-Powered Document Analysis
+                AI-Powered pdf Analysis
             </div>
         </div>
     """, unsafe_allow_html=True)
