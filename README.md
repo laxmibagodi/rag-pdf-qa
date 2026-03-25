@@ -3,120 +3,121 @@
 A production-ready **Retrieval-Augmented Generation (RAG)** app that lets you upload
 any PDF(s) and ask questions about them in a conversational chat interface.
 
-Built with **LangChain · FAISS · OpenAI · Streamlit**.
+---
+
+## 🚀 Tech Stack
+
+- **Streamlit** — Interactive UI  
+- **LangChain** — Document processing + retrieval  
+- **FAISS** — Vector database  
+- **HuggingFace Transformers** — QA model  
+- **Sentence Transformers** — Embeddings  
+- **PyPDFLoader / PyMuPDF** — PDF parsing  
 
 ---
 
-## Architecture
+## 🧠 Architecture
 
-```
+
 PDF Upload
-   │
-   ▼
-PyPDFLoader  ──► RecursiveCharacterTextSplitter  ──► Chunks
-                                                        │
-                                                        ▼
-                                              OpenAI Embeddings
-                                                        │
-                                                        ▼
-                                                 FAISS VectorStore
-                                                        │
-                         ┌──────────────────────────────┘
-                         ▼
-User Question ──► MMR Retriever (top-k chunks) ──► GPT-3.5-Turbo ──► Answer
-```
+│
+▼
+PyPDFLoader / PyMuPDF (fallback)
+│
+▼
+Text Cleaning + Preprocessing
+│
+▼
+RecursiveCharacterTextSplitter
+│
+▼
+Text Chunks
+│
+▼
+HuggingFace Embeddings (MiniLM)
+│
+▼
+FAISS Vector Store
+│
+▼
+MMR Retriever (Top-K)
+│
+▼
+Routing Logic
+├── Extractive QA → RoBERTa SQuAD2
+└── Open-ended → Chunk-based Summary
+│
+▼
+Final Answer + Sources
+
 
 ---
 
-## Quickstart (Local)
+## ✨ Key Features
 
-### 1. Clone / download the project
-```bash
-git clone <your-repo>
-cd rag_pdf_qa
-```
+- 📄 Upload and process multiple PDFs  
+- ⚡ Fully **offline-capable** (no OpenAI required)  
+- 💬 Conversational Q&A interface  
+- 🔍 Semantic search using embeddings  
+- 🎯 MMR retrieval (diverse + relevant chunks)  
+- 🧠 Smart routing:
+  - Extractive QA (precise answers)
+  - Summary mode (for open-ended questions)  
+- 🧾 Source attribution (file + page number)  
+- 🛠 Adjustable chunking parameters  
 
-### 2. Create a virtual environment
+---
+
+## 🔥 Unique Highlights
+
+### 🧠 Hybrid QA System
+- Uses **RoBERTa SQuAD2** for precise answer extraction  
+- Falls back to **context stitching** for summarization  
+- Detects intent using keyword-based routing  
+
+### 🧹 Robust PDF Handling
+- Automatically switches between:
+  - `PyPDFLoader`
+  - `PyMuPDFLoader` (fallback)
+- Cleans noisy text (e.g., spaced characters)
+
+### 💸 Zero API Cost
+- No OpenAI dependency  
+- Runs locally with HuggingFace models  
+
+---
+
+## 🛠️ Setup & Installation
+
+### 1. Clone the repository
 ```bash
+git clone https://github.com/laxmibagodi/rag-pdf-qa.git
+cd rag-pdf-qa
+2. Create virtual environment
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
-```
-
-### 3. Install dependencies
-```bash
+3. Install dependencies
 pip install -r requirements.txt
-```
-
-### 4. Set your OpenAI API key
-```bash
-cp .env.example .env
-# Edit .env and paste your key
-```
-
-### 5. Run the app
-```bash
+4. Run the app
 streamlit run app.py
-```
 
-Open http://localhost:8501 in your browser.
+Open in browser:
 
----
-
-## Deploy to Streamlit Community Cloud (Free)
-
-1. Push this folder to a **GitHub repository**.
-2. Go to [share.streamlit.io](https://share.streamlit.io) → **New app**.
-3. Select your repo, branch `main`, and file `app.py`.
-4. Click **Advanced settings → Secrets** and paste:
-   ```toml
-   OPENAI_API_KEY = "sk-..."
-   ```
-5. Click **Deploy**. Done! 🎉
-
----
-
-## File Structure
-
-```
-rag_pdf_qa/
-├── app.py              ← Streamlit UI (sidebar, chat interface)
-├── pdf_processor.py    ← PDF loading, chunking, FAISS indexing
-├── rag_chain.py        ← LangChain RAG chain with memory
+http://localhost:8501
+📁 Project Structure
+rag-pdf-qa/
+├── app.py              # Streamlit UI (chat interface)
+├── pdf_processor.py    # PDF loading, cleaning, chunking, embeddings
+├── rag_chain.py        # Retrieval + QA + routing logic
 ├── requirements.txt
-├── .env.example
-└── .streamlit/
-    └── secrets.toml.example
-```
-
----
-
-## Key Concepts
-
-| Concept | What it does |
-|---------|-------------|
-| **PyPDFLoader** | Extracts text from PDFs page by page |
-| **RecursiveCharacterTextSplitter** | Splits text into overlapping chunks |
-| **OpenAI Embeddings** | Converts text chunks to vectors |
-| **FAISS** | Stores vectors; retrieves similar chunks at query time |
-| **MMR Retrieval** | Picks *diverse* chunks (avoids duplicate context) |
-| **ConversationalRetrievalChain** | Maintains chat history + calls LLM |
-| **GPT-3.5-Turbo** | Generates the final answer from retrieved context |
-
----
-
-## Customisation Ideas
-
-- Swap `text-embedding-3-small` → `text-embedding-3-large` for better accuracy
-- Swap `gpt-3.5-turbo` → `gpt-4o` for deeper reasoning
-- Add **Chroma** as a persistent vector store (survives restarts)
-- Add **HuggingFace embeddings** to run fully offline (free)
-- Export chat history as PDF/markdown
-
----
-
-## Cost Estimate
-
-- Embedding 100 pages of PDF ≈ **~$0.002** (text-embedding-3-small)
-- Each Q&A turn ≈ **~$0.001** (gpt-3.5-turbo)
-
-Essentially free for personal use. ✅
+└── README.md
+🔑 Core Components
+Component	Description
+PyPDFLoader / PyMuPDF	Extracts text from PDFs
+Text Cleaning	Fixes broken spacing and formatting
+Text Splitter	Splits into overlapping chunks
+MiniLM Embeddings	Converts text → vectors
+FAISS	Fast similarity search
+MMR Retriever	Improves diversity of results
+RoBERTa SQuAD2	Extracts exact answers
+Routing Logic	Chooses QA vs summary mode
