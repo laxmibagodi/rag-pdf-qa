@@ -1,20 +1,55 @@
-from langchain_core.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough, RunnableLambda
-from transformers import pipeline
 import streamlit as st
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+import torch
 
 
 @st.cache_resource
-def load_qa_pipeline():
-    """
-    deepset/roberta-base-squad2 is a TRUE extractive Q&A model.
-    It reads context and extracts the exact answer span — no hallucination.
-    """
-    return pipeline(
-        "question-answering",
-        model="deepset/roberta-base-squad2",
+def load_qa_model():
+    model_name = "deepset/roberta-base-squad2"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForQuestionAnswering.from_pretrained(model_name)
+    model.eval()
+    return tokenizer, model
+
+
+def get_answer_from_context(question: str, context: str) -> dict:
+    tokenizer, model = load_qa_model()
+
+    # Truncate context to avoid token limit (max 512 for roberta)
+    inputs = tokenizer(
+        question,
+        context,
+        return_tensors="pt",
+        truncation=True,
+        max_length=512,
+        stride=128,
+        return_overflowing_tokens=True,
+        padding=True,
     )
+
+    best_answer = ""
+    best_score = -float("inf")
+
+    for i in range(inputs["input_ids"].shape[0]):
+        input_ids = inputs["input_ids"][i].unsqueeze(0)
+        attention_mask = inputs["attention_mask"][i].unsqueeze(0)
+
+        with torch.no_grad():
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+
+        start_scores = outputs.start_logits[0]
+        end_scores = outputs.end_logits[0]
+
+        start_idx = torch.argmax(start_scores).item()
+        end_idx = torch.argmax(end_scores).item()
+        score = (start_scores[start_idx] + end_scores[end_idx]).item()
+
+        if end_idx >= start_idx and score > best_score:
+            best_score = score
+            tokens = inputs["input_ids"][i][start_idx: end_idx + 1]
+            best_answer = tokenizer.decode(tokens, skip_special_tokens=True).strip()
+
+    return {"answer": best_answer, "score": best_score}
 
 
 def build_rag_chain(vectorstore, top_k=4):
@@ -22,35 +57,32 @@ def build_rag_chain(vectorstore, top_k=4):
         search_type="mmr",
         search_kwargs={"k": top_k, "fetch_k": top_k * 3},
     )
-    return retriever  # we handle the chain manually in ask_question
+    return retriever
 
 
-def ask_question(chain_tuple, question, chat_history):
-    # chain_tuple is just the retriever here
-    retriever = chain_tuple
-
+def ask_question(retriever, question: str, chat_history):
     # Step 1: Retrieve relevant chunks
     docs = retriever.invoke(question)
 
     if not docs:
         return {"answer": "I couldn't find that in the uploaded documents.", "sources": []}
 
-    # Step 2: Combine chunks into one context string
-    context = "\n\n".join(doc.page_content for doc in docs)
+    # Step 2: Try each chunk and pick the best answer
+    best_answer = ""
+    best_score = -float("inf")
 
-    # Step 3: Run extractive Q&A
-    qa_pipeline = load_qa_pipeline()
+    for doc in docs:
+        context = doc.page_content.strip()
+        if not context:
+            continue
+        result = get_answer_from_context(question, context)
+        if result["score"] > best_score:
+            best_score = result["score"]
+            best_answer = result["answer"]
 
-    try:
-        result = qa_pipeline(question=question, context=context, max_answer_len=200)
-        answer = result["answer"].strip()
-        score = result["score"]
-
-        # If model is not confident, say so
-        if score < 0.05 or not answer:
-            answer = "I couldn't find a clear answer in the uploaded documents."
-    except Exception as e:
-        answer = f"Error during answering: {str(e)}"
+    # Step 3: Confidence check
+    if not best_answer or best_score < 0.5:
+        best_answer = "I couldn't find a clear answer in the uploaded documents."
 
     # Step 4: Collect sources
     sources = []
@@ -63,4 +95,4 @@ def ask_question(chain_tuple, question, chat_history):
             sources.append(label)
             seen.add(label)
 
-    return {"answer": answer, "sources": sources}
+    return {"answer": best_answer, "sources": sources}
