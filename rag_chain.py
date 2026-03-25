@@ -1,6 +1,20 @@
 import streamlit as st
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering
 import torch
+import re
+
+# ── Keywords that signal the user wants a summary or listing, not a QA span ──
+SUMMARY_TRIGGERS = [
+    "summarise", "summarize", "summary", "overview", "brief",
+    "list all", "list the", "what are", "who are", "mention all",
+    "key points", "key findings", "main points", "tell me about",
+    "describe", "explain", "what is this document", "what does this document",
+]
+
+
+def is_open_ended(question: str) -> bool:
+    q = question.lower().strip()
+    return any(trigger in q for trigger in SUMMARY_TRIGGERS)
 
 
 @st.cache_resource
@@ -59,44 +73,72 @@ def build_rag_chain(vectorstore, top_k=4):
     return retriever
 
 
+def make_summary_answer(docs) -> str:
+    """
+    For open-ended / summarisation queries, stitch the top chunks
+    together into a readable passage instead of extracting a span.
+    """
+    parts = []
+    for doc in docs:
+        text = doc.page_content.strip()
+        if text:
+            text = re.sub(r"\n{3,}", "\n\n", text)
+            parts.append(text)
+
+    if not parts:
+        return "I couldn't find enough content in the uploaded documents."
+
+    combined = "\n\n".join(parts)
+
+    # Trim to a readable length (~1200 chars)
+    if len(combined) > 1200:
+        combined = combined[:1200].rsplit(" ", 1)[0] + "…"
+
+    return combined
+
+
 def ask_question(retriever, question: str, chat_history):
     # Step 1: Retrieve relevant chunks
     docs = retriever.invoke(question)
     if not docs:
         return {"answer": "I couldn't find that in the uploaded documents.", "sources": []}
 
-    best_answer = ""
-    best_score = -float("inf")
+    # Step 2: Route — summarisation vs extractive QA
+    if is_open_ended(question):
+        # For open-ended questions, return the relevant chunks directly
+        # roberta-base-squad2 is extractive only — it cannot summarise
+        answer = make_summary_answer(docs)
+    else:
+        best_answer = ""
+        best_score = -float("inf")
 
-    # Step 2a: Try each chunk individually
-    for doc in docs:
-        context = doc.page_content.strip()
-        if not context:
-            continue
-        result = get_answer_from_context(question, context)
-        if result["score"] > best_score:
-            best_score = result["score"]
-            best_answer = result["answer"]
+        # Try each chunk individually
+        for doc in docs:
+            context = doc.page_content.strip()
+            if not context:
+                continue
+            result = get_answer_from_context(question, context)
+            if result["score"] > best_score:
+                best_score = result["score"]
+                best_answer = result["answer"]
 
-    # Step 2b: Also try combined context
-    # Helps when the answer spans across chunk boundaries
-    combined_context = " ".join(
-        doc.page_content.strip() for doc in docs if doc.page_content.strip()
-    )
-    if combined_context:
-        result = get_answer_from_context(question, combined_context)
-        if result["score"] > best_score:
-            best_score = result["score"]
-            best_answer = result["answer"]
+        # Also try combined context (catches answers near chunk boundaries)
+        combined_context = " ".join(
+            doc.page_content.strip() for doc in docs if doc.page_content.strip()
+        )
+        if combined_context:
+            result = get_answer_from_context(question, combined_context)
+            if result["score"] > best_score:
+                best_score = result["score"]
+                best_answer = result["answer"]
 
-    # Step 3: Confidence check
-    # RoBERTa returns raw logits, NOT probabilities (range ~-10 to +10).
-    # A threshold of 0.5 was incorrectly rejecting valid answers.
-    # -5 is a safe lower bound for a real answer being present.
-    if not best_answer or best_score < -5:
-        best_answer = "I couldn't find a clear answer in the uploaded documents."
+        # Confidence check — RoBERTa returns raw logits, NOT probabilities
+        if not best_answer or best_score < -5:
+            best_answer = "I couldn't find a clear answer in the uploaded documents."
 
-    # Step 4: Collect sources
+        answer = best_answer
+
+    # Step 3: Collect sources
     sources = []
     seen = set()
     for doc in docs:
@@ -107,4 +149,4 @@ def ask_question(retriever, question: str, chat_history):
             sources.append(label)
             seen.add(label)
 
-    return {"answer": best_answer, "sources": sources}
+    return {"answer": answer, "sources": sources}
