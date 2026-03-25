@@ -5,9 +5,14 @@ from rag_chain import build_rag_chain, ask_question
 
 load_dotenv()
 
-st.set_page_config(page_title="Document Intelligence", page_icon="📄", layout="wide")
+st.set_page_config(
+    page_title="Document Intelligence",
+    page_icon="📄",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# ── Professional Theme ─────────────────────────────────────────────────────────
+# ── Professional Theme + Sidebar Fix ──────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
@@ -22,6 +27,7 @@ st.markdown("""
     --muted: #6b7280;
 }
 
+/* Base */
 html, body, [data-testid="stAppViewContainer"] {
     background: var(--bg) !important;
     color: var(--text) !important;
@@ -32,11 +38,21 @@ html, body, [data-testid="stAppViewContainer"] {
 [data-testid="stSidebar"] {
     background: var(--surface) !important;
     border-right: 1px solid var(--border);
+    padding: 1rem 1rem 2rem 1rem !important;
+    overflow-y: auto !important;
 }
-[data-testid="stSidebar"] * { color: var(--text) !important; }
+
+[data-testid="stSidebar"] .block-container {
+    padding-top: 0.5rem !important;
+}
+
+section[data-testid="stSidebar"] > div {
+    overflow: visible !important;
+}
 
 /* Buttons */
 .stButton > button {
+    width: 100% !important;
     background: var(--primary);
     color: white;
     border-radius: 6px;
@@ -55,6 +71,21 @@ html, body, [data-testid="stAppViewContainer"] {
 .stTextInput input:focus {
     border-color: var(--primary) !important;
     box-shadow: 0 0 0 2px var(--primary-soft);
+}
+
+/* File uploader */
+[data-testid="stFileUploader"] {
+    width: 100% !important;
+    padding: 0.5rem !important;
+    background: var(--surface) !important;
+    border: 1px dashed var(--border) !important;
+    border-radius: 8px !important;
+}
+
+/* Sliders spacing */
+.stSlider {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
 }
 
 /* Chat */
@@ -122,13 +153,21 @@ with st.sidebar:
 
     st.divider()
 
-    uploaded_files = st.file_uploader("Upload PDFs", type=["pdf"], accept_multiple_files=True)
+    uploaded_files = st.file_uploader(
+        "Upload PDFs",
+        type=["pdf"],
+        accept_multiple_files=True
+    )
+
+    st.markdown("### Settings")
 
     chunk_size = st.slider("Chunk Size", 256, 1024, 512, 64)
     overlap = st.slider("Chunk Overlap", 0, 200, 50, 25)
     top_k = st.slider("Top-K Retrieval", 1, 8, 4)
 
-    if st.button("Process Documents", use_container_width=True):
+    st.markdown("")
+
+    if st.button("Process Documents"):
         if not uploaded_files:
             st.warning("Please upload at least one PDF.")
         else:
@@ -148,7 +187,7 @@ with st.sidebar:
 
     st.divider()
 
-    if st.button("Clear Data", use_container_width=True):
+    if st.button("Clear Data"):
         st.session_state.vectorstore = None
         st.session_state.chat_history = []
         st.session_state.num_docs = 0
@@ -162,7 +201,6 @@ st.caption("Upload documents and interact with them using AI-powered retrieval."
 if not st.session_state.vectorstore:
     st.info("Upload PDFs and process them to begin querying.")
 else:
-    # Chat history
     if st.session_state.chat_history:
         st.subheader("Conversation")
         for turn in st.session_state.chat_history:
@@ -172,7 +210,6 @@ else:
             for s in turn.get("sources", []):
                 st.markdown(f'<span class="source-chip">{s}</span>', unsafe_allow_html=True)
 
-    # Input
     with st.form("qa_form", clear_on_submit=True):
         col1, col2 = st.columns([5, 1])
         question = col1.text_input("Ask a question", placeholder="e.g. What are the key clauses?")
@@ -190,7 +227,6 @@ else:
         })
         st.rerun()
 
-    # Suggestions
     if not st.session_state.chat_history:
         st.subheader("Try asking")
         suggestions = [
