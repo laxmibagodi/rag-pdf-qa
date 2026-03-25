@@ -1,105 +1,64 @@
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
-
+from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from transformers import pipeline
-from langchain_huggingface import HuggingFacePipeline
-
 import streamlit as st
 
 
-# 🔥 IMPROVED PROMPT (STRICT + CLEAN OUTPUT)
-_QA_TEMPLATE = """Answer the question using ONLY the context below.
-
-If the answer is not in the context, say:
-"I couldn't find that in the uploaded documents."
-
-Give a clean, structured answer (use bullet points if needed).
-
-Context:
-{context}
-
-Question: {question}
-
-Answer:"""
-
-_QA_PROMPT = PromptTemplate.from_template(_QA_TEMPLATE)
-
 @st.cache_resource
-def load_model():
-    pipe = pipeline(
-        "text-generation",
-        model="distilgpt2",   # fast + stable
-        max_new_tokens=120,
-        temperature=0.3,
+def load_qa_pipeline():
+    """
+    deepset/roberta-base-squad2 is a TRUE extractive Q&A model.
+    It reads context and extracts the exact answer span — no hallucination.
+    """
+    return pipeline(
+        "question-answering",
+        model="deepset/roberta-base-squad2",
     )
-    return HuggingFacePipeline(pipeline=pipe)
 
 
-def build_rag_chain(vectorstore, top_k=2):
-
+def build_rag_chain(vectorstore, top_k=4):
     retriever = vectorstore.as_retriever(
         search_type="mmr",
-        search_kwargs={"k": top_k},
+        search_kwargs={"k": top_k, "fetch_k": top_k * 3},
     )
-
-    # ✅ USE CACHED MODEL
-    llm = load_model()
-
-    def format_docs(docs):
-        return "\n\n".join(doc.page_content[:300] for doc in docs)
-
-    chain = (
-        {"context": retriever | format_docs, "question": RunnablePassthrough()}
-        | _QA_PROMPT
-        | llm
-        | StrOutputParser()
-    )
-
-    return chain, retriever
-
-
-def clean_answer(text: str) -> str:
-    """
-    Removes prompt leakage and junk repetition
-    """
-    if not text:
-        return ""
-
-    # Remove accidental prompt echoes
-    if "Answer:" in text:
-        text = text.split("Answer:")[-1]
-
-    # Remove excessive repetition
-    lines = text.split("\n")
-    cleaned = []
-    seen = set()
-
-    for line in lines:
-        line = line.strip()
-        if line and line not in seen:
-            cleaned.append(line)
-            seen.add(line)
-
-    return "\n".join(cleaned).strip()
+    return retriever  # we handle the chain manually in ask_question
 
 
 def ask_question(chain_tuple, question, chat_history):
-    chain, retriever = chain_tuple
+    # chain_tuple is just the retriever here
+    retriever = chain_tuple
 
-    raw_answer = chain.invoke(question)
-    answer = clean_answer(raw_answer)
-
+    # Step 1: Retrieve relevant chunks
     docs = retriever.invoke(question)
 
+    if not docs:
+        return {"answer": "I couldn't find that in the uploaded documents.", "sources": []}
+
+    # Step 2: Combine chunks into one context string
+    context = "\n\n".join(doc.page_content for doc in docs)
+
+    # Step 3: Run extractive Q&A
+    qa_pipeline = load_qa_pipeline()
+
+    try:
+        result = qa_pipeline(question=question, context=context, max_answer_len=200)
+        answer = result["answer"].strip()
+        score = result["score"]
+
+        # If model is not confident, say so
+        if score < 0.05 or not answer:
+            answer = "I couldn't find a clear answer in the uploaded documents."
+    except Exception as e:
+        answer = f"Error during answering: {str(e)}"
+
+    # Step 4: Collect sources
     sources = []
     seen = set()
-
     for doc in docs:
         src = doc.metadata.get("source", "unknown")
         page = doc.metadata.get("page", "")
         label = f"{src} (p.{int(page)+1})" if page != "" else src
-
         if label not in seen:
             sources.append(label)
             seen.add(label)
