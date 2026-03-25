@@ -1,5 +1,3 @@
-import rag_chain
-print("Loaded from:", rag_chain.__file__)
 import streamlit as st
 from dotenv import load_dotenv
 from pdf_processor import process_pdfs
@@ -29,7 +27,7 @@ h1,h2,h3 { font-family: 'DM Serif Display', serif !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# Session state
+# ── Session state ──────────────────────────────────────────────────────────────
 if "vectorstore" not in st.session_state:
     st.session_state.vectorstore = None
 if "chat_history" not in st.session_state:
@@ -39,7 +37,7 @@ if "num_docs" not in st.session_state:
 if "num_chunks" not in st.session_state:
     st.session_state.num_chunks = 0
 
-# Sidebar
+# ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 🧠 PDF Brain")
     st.markdown("*Upload → Embed → Ask*")
@@ -78,7 +76,7 @@ with st.sidebar:
         st.session_state.num_chunks = 0
         st.rerun()
 
-# Main
+# ── Main ───────────────────────────────────────────────────────────────────────
 st.markdown("# Ask Your *Documents*")
 st.markdown('<p style="color:#888">Upload PDFs on the left, then ask anything below.</p>', unsafe_allow_html=True)
 
@@ -102,8 +100,8 @@ else:
 
     if submitted and question.strip():
         with st.spinner("Thinking…"):
-            chain_tuple = build_rag_chain(st.session_state.vectorstore, top_k)
-            result = ask_question(chain_tuple, question, st.session_state.chat_history)
+            retriever = build_rag_chain(st.session_state.vectorstore, top_k)  # ✅ returns retriever
+            result = ask_question(retriever, question, st.session_state.chat_history)
         st.session_state.chat_history.append({
             "question": question,
             "answer": result["answer"],
@@ -113,12 +111,21 @@ else:
 
     if not st.session_state.chat_history:
         st.markdown("#### Try asking…")
-        suggestions = ["Summarise this document.", "What are the key findings?", "List all dates mentioned.", "Who are the main people involved?"]
+        suggestions = [
+            "Summarise this document.",
+            "What are the key findings?",
+            "List all dates mentioned.",
+            "Who are the main people involved?",
+        ]
         cols = st.columns(2)
         for i, s in enumerate(suggestions):
             if cols[i % 2].button(s, key=f"sug_{i}"):
                 with st.spinner("Thinking…"):
-                    chain_tuple = build_rag_chain(st.session_state.vectorstore, top_k)
-                    result = ask_question(chain_tuple, s, [])
-                st.session_state.chat_history.append({"question": s, "answer": result["answer"], "sources": result["sources"]})
+                    retriever = build_rag_chain(st.session_state.vectorstore, top_k)  # ✅
+                    result = ask_question(retriever, s, [])
+                st.session_state.chat_history.append({
+                    "question": s,
+                    "answer": result["answer"],
+                    "sources": result["sources"],
+                })
                 st.rerun()
